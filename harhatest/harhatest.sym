@@ -1,0 +1,22 @@
+.label screenRam=$c00
+.label tmp_1=$8003
+.label rstr_indx_y=$801e
+.label tmpa=$8000
+.label main=$810 {
+  .label scr_init=$87b
+  .label prg_init=$813
+  .label rstr_init=$890
+  .label image_draw=$8b5
+  .label music_init=$889
+  .label rstr_render=$89e
+  .label setup_irq=$81f
+  .label end=$8ec
+  .label irq1=$84c
+}
+.label bitmapRam=$2000
+.label rstr_colors=$8004
+.label tmpx=$8001
+.label colorRam=$1c00
+.label tmpy=$8002
+.label rstr_sine_y=$801f
+.label rstr_indx_c=$801d
