@@ -1,6 +1,6 @@
 // Variables
 .var music = LoadSid("res/music.sid")
-.var image = LoadBinary("res/image.kla", BF_KOALA)
+.var image = LoadBinary("res/fairlight.kla", BF_KOALA)
 
 // Basic upstart
 .pc = $0801 "basic"
@@ -18,9 +18,9 @@ prg_init:
 		jsr music_init
 		jsr image_draw
 		jmp setup_irq
-		
+
 setup_irq:
-		sei
+		sei							// Disable interrupts
 		lda #%01111111
 		sta $dc0d					// Interrupt control & status register
 		lda #%00000001
@@ -37,7 +37,7 @@ setup_irq:
 		sta $fffe					// Interrupt service routine lowbit
 		lda #>irq1
 		sta $ffff					// Interrupt service routine highbit
-		cli
+		cli							// Enable interrupts
 		jmp *
 
 /*
@@ -65,20 +65,22 @@ irq1:
 		stx tmpx
 		sty tmpy
 		lda $01
-		sta tmp_1
+		sta tmp1
 		lda #$35
 		sta $01
 		dec $d019
 		ldx #$01
 		dex
 		bpl *-1
-		
+
 		// Execute code
+		inc $d020
         jsr music.play
+        dec $d020
         jsr rstr_init
-        
+
         // Quit the interrupt, load the values
-		lda tmp_1
+		lda tmp1
 		sta $01
 		ldy tmpy
 		ldx tmpx
@@ -92,12 +94,12 @@ scr_init:
 		sta $d020					// Make the border color black
 		sta $d021					// Make the screen color black
 		rts
-		
+
 music_init:
 		ldx #0
 		ldy #0
 		jsr music.init
-		
+
 rstr_init:
 		ldx rstr_indx_y				// Rasterline y-position index memory
 		ldy rstr_sine_y,x			// Rasterline y-position
@@ -112,11 +114,11 @@ rstr_render:
 		sta $d020					// Store the current color in accumulator to the border color
 		sta $d021					// Do the same for screen color
 		cpx #24
-		beq end						// Branch to end if the value in x is equal to #51 decimal
+		beq end						// Branch to end if the value in x is equal to #24 decimal
 		inx
 		iny
 		jmp rstr_render
-		
+
 image_draw:
 		lda #$38
 		sta $d018
@@ -149,10 +151,10 @@ end:
 .pc = $8000 "data"
 
 // Temp bytes used to store/load a, x and y register values to and from while going/exiting an interrupt
-tmpa:	.byte $22
-tmpx:	.byte $23
-tmpy:	.byte $24
-tmp_1:	.byte $25
+tmpa:	.byte $00
+tmpx:	.byte $00
+tmpy:	.byte $00
+tmp1:	.byte $00
 
 rstr_colors:
 		.byte $04,$04,$04,$0e,$04,$04
@@ -170,7 +172,7 @@ rstr_indx_y:
 rstr_sine_y:
 		.fill 256, 127 + 127 + round(10 * sin(toRadians(180 * i / 64)) * sin(toRadians(45 * i / 64)))
 
-// Memory block for music below		
+// Memory block for music below
 .pc = music.location "music" .fill music.size, music.getData(i)
 
 // Memory blocks for image below
