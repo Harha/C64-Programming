@@ -18,75 +18,98 @@ prg_init:
 		jsr music_init
 		jsr image_draw
 		jmp setup_irq
-
+		
 setup_irq:
-		sei							// Disable interrupts
+		sei							// Disable maskable IRQs
 		lda #%01111111
 		sta $dc0d					// Interrupt control & status register
+		sta $dd0d					// Stop the kernel cursor flash / keyboard update interrupt
+		lda $dc0d					// Read these two registers again to negate any pending CIA IRQs
+		lda $dd0d					// Otherwise, pending CIA IRQs might occur after we finish setup_irq
 		lda #%00000001
 		sta $d01a					// Interrupt control register
 		sta $d019					// Interrupt status register
-		lda #$32
+		lda #$00
 		sta $d012					// Rasterline to generate interrupt at
-		lda $d011
-		and #$3f
+		lda #%00111111
 		sta $d011					// Screen control register
-		lda #$34
-		sta $01
+		lda #%00110101
+		sta $0001					// CPU Port, turn off the BASIC and KERNAL rom, CPU now sees RAM everywhere except at $d000-$e000 (Registers of SID/VICII/etc)
 		lda #<irq1
 		sta $fffe					// Interrupt service routine lowbit
 		lda #>irq1
 		sta $ffff					// Interrupt service routine highbit
 		cli							// Enable interrupts
-		jmp *
-
-/*
-        sei							// Disable interrupts
-        lda #<irq1					// Redirect the next interrupt to irq1 routine
-        sta $fffe					// $0314 Low-byte
-        lda #>irq1
-        sta $ffff					// $0315 High-byte
-        asl $d019					// Aknowledge the interrupt by clearing the VIC's interrupt flag
-        lda #$7b					// 01111111b
-        sta $dc0d					// Switch off interrupt signals from CIA-1
-        lda #$81					// 10000001b
-        sta $d01a					// Enable raster interrupts
-        lda #$1b
-        sta $d011					// Turn off the screen, only use borders
-        lda #$80
-        sta $d012					// Current rasterline
-        cli							// Enable interrupts
-        jmp *
-*/
+		jmp *						// No way back to the system, ROMs are switched off, etc.
 
 irq1:
-		// Enter the interrupt, store values
-		sta tmpa
-		stx tmpx
-		sty tmpy
-		lda $01
-		sta tmp1
-		lda #$35
-		sta $01
-		dec $d019
-		ldx #$01
-		dex
-		bpl *-1
-
+		// Enter the interrupt safely
+		pha							// Store register A in stack
+		txa
+		pha							// Store register X in stack
+		tya
+		pha							// Store register Y in stack
+		
+		//lda #%11111111
+		//sta $d019					// Safe way of clearing the interrupt condition of the VICII
+		
 		// Execute code
 		inc $d020
-        jsr music.play
-        dec $d020
-        jsr rstr_init
-
-        // Quit the interrupt, load the values
-		lda tmp1
-		sta $01
-		ldy tmpy
-		ldx tmpx
-		lda tmpa
-		rti
-
+		jsr music.play
+		dec $d020
+		
+		// Set the next interrupt routine
+		ldx #<irq2
+		stx $fffe
+		ldx #>irq2
+		stx $ffff
+		lda #$c0
+		sta $d012					// Rasterline to generate the interrupt at
+		sec
+		rol $d019
+		
+		// Exit the interrupt safely
+		pla
+		tay							// Restore register Y from stack (Stack is FIFO: First in First out)
+		pla
+		tax							// Restore register X from stack
+		pla							// Restore register A from stack
+		
+		rti							// Return from the interrupt
+		
+irq2:
+		// Enter the interrupt safely
+		pha							// Store register A in stack
+		txa
+		pha							// Store register X in stack
+		tya
+		pha							// Store register Y in stack
+		
+		//lda #%11111111
+		//sta $d019					// Safe way of clearing the interrupt condition of the VICII
+		
+		// Execute code
+		jsr rstr_init
+		
+		// Set the next interrupt routine
+		ldx #<irq1
+		stx $fffe
+		ldx #>irq1
+		stx $ffff
+		lda #$00
+		sta $d012					// Rasterline to generate the interrupt at
+		sec
+		rol $d019
+		
+		// Exit the interrupt safely
+		pla
+		tay							// Restore register Y from stack (Stack is FIFO: First in First out)
+		pla
+		tax							// Restore register X from stack
+		pla							// Restore register A from stack
+		
+		rti							// Return from the interrupt
+		
 scr_init:
 		lda #%00000000
 		sta $d011					// Screen mode
@@ -94,12 +117,12 @@ scr_init:
 		sta $d020					// Make the border color black
 		sta $d021					// Make the screen color black
 		rts
-
+		
 music_init:
 		ldx #0
 		ldy #0
 		jsr music.init
-
+		
 rstr_init:
 		ldx rstr_indx_y				// Rasterline y-position index memory
 		ldy rstr_sine_y,x			// Rasterline y-position
@@ -118,7 +141,7 @@ rstr_render:
 		inx
 		iny
 		jmp rstr_render
-
+		
 image_draw:
 		lda #$38
 		sta $d018
@@ -172,7 +195,7 @@ rstr_indx_y:
 rstr_sine_y:
 		.fill 256, 127 + 127 + round(10 * sin(toRadians(180 * i / 64)) * sin(toRadians(45 * i / 64)))
 
-// Memory block for music below
+// Memory block for music below		
 .pc = music.location "music" .fill music.size, music.getData(i)
 
 // Memory blocks for image below

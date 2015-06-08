@@ -2,15 +2,16 @@
 .label rstr_indx_y=$801e
 .label tmpa=$8000
 .label main=$810 {
-  .label scr_init=$881
+  .label scr_init=$89a
   .label prg_init=$813
-  .label rstr_init=$896
-  .label image_draw=$8bb
-  .label music_init=$88f
-  .label rstr_render=$8a4
+  .label rstr_init=$8af
+  .label image_draw=$8d4
+  .label music_init=$8a8
+  .label rstr_render=$8bd
   .label setup_irq=$81f
-  .label end=$8f2
-  .label irq1=$84c
+  .label irq2=$879
+  .label end=$90b
+  .label irq1=$852
 }
 .label bitmapRam=$2000
 .label tmp1=$8003
