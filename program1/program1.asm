@@ -1,11 +1,6 @@
-// Constants
-.const music = LoadSid("res/music.sid")
-.const image = LoadBinary("res/fairlight.kla", BF_KOALA)
-.const scr_addr = $d011
-.const scr_bitmap = %00111111
-.const scr_text = %00011111
-.const scrl_left = $0798
-.const scrl_right = $07bf
+// Variables
+.var music = LoadSid("res/music.sid")
+.var image = LoadBinary("res/fairlight.kla", BF_KOALA)
 
 // Basic upstart
 .pc = $0801 "basic"
@@ -36,7 +31,7 @@ setup_irq:
 		sta $d019					// Interrupt status register
 		lda #$00
 		sta $d012					// Rasterline to generate interrupt at
-		lda #scr_bitmap
+		lda #%00111111
 		sta $d011					// Screen control register
 		lda #%00110101
 		sta $0001					// CPU Port, turn off the BASIC and KERNAL rom, CPU now sees RAM everywhere except at $d000-$e000 (Registers of SID/VICII/etc)
@@ -59,11 +54,6 @@ irq1:
 		//sta $d019					// Safe way of clearing the interrupt condition of the VICII
 		
 		// Execute code
-		lda #scr_bitmap
-		sta $d011
-		
-		jsr image_init
-		
 		inc $d020
 		jsr music.play
 		dec $d020
@@ -73,7 +63,7 @@ irq1:
 		stx $fffe
 		ldx #>irq2
 		stx $ffff
-		lda #$e0
+		lda #$c0
 		sta $d012					// Rasterline to generate the interrupt at
 		sec
 		rol $d019
@@ -99,12 +89,6 @@ irq2:
 		//sta $d019					// Safe way of clearing the interrupt condition of the VICII
 		
 		// Execute code
-		lda #scr_text
-		sta $d011
-		
-		jsr image_reset
-		
-		jsr txt_init
 		jsr rstr_init
 		
 		// Set the next interrupt routine
@@ -127,30 +111,17 @@ irq2:
 		rti							// Return from the interrupt
 		
 scr_init:
+		lda #%00000000
+		sta $d011					// Screen mode
 		lda #$00
 		sta $d020					// Make the border color black
 		sta $d021					// Make the screen color black
-scr_clear:
-		lda #$20					// $20 Is spacebar
-		sta $0400,x					// Set character memory area values
-		sta $0500,x
-		sta $0600,x
-		sta $06e8,x
-		lda #$01					// $00 Foreground color is white
-		sta $d800,x					// Set foreground color memory area values
-		sta $d900,x
-		sta $da00,x
-		sta $dae8,x
-		inx							// Increment x
-		bne scr_clear
 		rts
 		
 music_init:
-		lda #$00
-		ldx #$00
-		ldy #$00
+		ldx #0
+		ldy #0
 		jsr music.init
-		rts
 		
 rstr_init:
 		ldx rstr_indx_y				// Rasterline y-position index memory
@@ -158,6 +129,7 @@ rstr_init:
 		ldx #$00
 		stx rstr_indx_c				// Rasterline current color index
 		inc rstr_indx_y
+
 rstr_render:
 		lda rstr_colors,x			// Load the current rasterline color to accumulator
 		cpy $d012					// Compare the value in y against current rasterline
@@ -169,60 +141,28 @@ rstr_render:
 		inx
 		iny
 		jmp rstr_render
-
-image_init:
-		lda #$38					// %0011 1000 <-- default at startup: %0001 0101
-		sta $d018					// Memory setup register, last 4 bits = screen memory space set
-		lda #$d8
-		sta $d016					// Screen control register #2
-		rts
-		
-image_reset:
-		lda #%00010101
-		sta $d018
-		lda #%11001000
-		sta $d016
-		rts
 		
 image_draw:
+		lda #$38
+		sta $d018
+		lda #$d8
+		sta $d016
+		lda #$3b
+		sta $d011
+		lda #0
+		sta $d020
 		lda #image.getBackgroundColor()
 		sta $d021
 		ldx #0
-!image_loop1:
+
+!image_loop:
 		.for (var i = 0; i < 4; i++)
 		{
 			lda colorRam + i * $100,x
 			sta $d800 + i * $100,x
 		}
 		inx
-		bne !image_loop1-
-		
-		ldx #0
-image_loop2:
-		lda #$01
-		sta $db45,x
-		inx
-		bne image_loop2
-		/*
-		ldx #0
-image_loop3:
-		lda #$ff
-		sta $0600,x
-		inx
-		cpx #64
-		bne image_loop3
-		*/
-		rts
-		
-txt_init:
-		ldx #$00
-txt_loop:
-		lda txt_data,x
-		sta scrl_left,x
-		inx
-		tay
-		cpy #$00
-		bne txt_loop
+		bne !image_loop-
 		rts
 
 end:
@@ -254,10 +194,6 @@ rstr_indx_y:
 
 rstr_sine_y:
 		.fill 256, 127 + 127 + round(10 * sin(toRadians(180 * i / 64)) * sin(toRadians(45 * i / 64)))
-		
-txt_data:
-		.text "testing this... looks like crap ikr :("
-		.byte $00
 
 // Memory block for music below		
 .pc = music.location "music" .fill music.size, music.getData(i)
